@@ -2,17 +2,25 @@
   "version": 2,
   "builds": [
     {
-      "src": "frontend/**",
-      "use": "@vercel/static"
-    },
-    {
       "src": "app/main.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
       "src": "/vca/(.*)",
+      "dest": "app/main.py"
+    },
+    {
+      "src": "/docs",
+      "dest": "app/main.py"
+    },
+    {
+      "src": "/openapi.json",
       "dest": "app/main.py"
     },
     {
