@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VCA - Verbal Communication Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- FontAwesome for Dashboard Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation (Left Panel) -->
+        <aside class="sidebar">
+            <div class="logo-section">
+                <div class="logo-icon"><i class="fa-solid fa-wave-square"></i></div>
+                <div class="logo-text">
+                    <h2>VCA</h2>
+                    <p>VERBAL COMMUNICATION ANALYZER</p>
+                </div>
+            </div>
+            
+            <p class="sidebar-description">
+                Upload audio files and receive AI-powered communication analysis including pronunciation, fluency, pace, vocabulary, and expressiveness.
+            </p>
+
+            <nav class="sidebar-nav">
+                <div class="nav-item active"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Powered Analysis</div>
+                <div class="nav-item"><i class="fa-solid fa-chart-line"></i> Detailed Insights</div>
+                <div class="nav-item"><i class="fa-solid fa-shield-halved"></i> Secure & Private</div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="soundwave-bar">
+                    <span></span><span></span><span></span><span></span><span></span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace (Right Panel) -->
+        <main class="main-content">
+            <!-- Audio File Upload Section -->
+            <section class="card upload-card">
+                <h2>Upload Audio</h2>
+                <p class="subtitle">Upload any audio file for AI communication analysis.</p>
+
+                <div class="dropzone" id="dropzone">
+                    <input type="file" id="audioInput" accept="audio/*,.m4a,.mp3,.wav,.aac,.flac,.ogg" hidden>
+                    <div class="upload-icon-circle">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                    </div>
+                    <button type="button" class="btn-browse" id="btnBrowse">Browse File</button>
+                    <div class="file-status">
+                        <span id="fileNameDisplay">No file selected</span>
+                        <i class="fa-solid fa-circle-check status-check" id="statusCheck"></i>
+                    </div>
+                </div>
+
+                <button class="btn-analyze" id="btnAnalyze" disabled>
+                    <i class="fa-solid fa-bolt"></i> <span id="btnText">Analyze Audio</span>
+                </button>
+            </section>
+
+            <!-- Analysis Results Dashboard Section -->
+            <section class="results-container" id="resultsSection" style="display: none;">
+                <!-- Overall Score Banner -->
+                <div class="overall-banner">
+                    <div class="trophy-badge"><i class="fa-solid fa-trophy"></i></div>
+                    <div class="overall-text">
+                        <span class="sub-heading">OVERALL RATING</span>
+                        <h1 id="ratingLabel">--</h1>
+                        <p>Your communication skills score based on AI audio processing.</p>
+                    </div>
+                    <div class="score-circle">
+                        <span id="overallScoreNum">0</span>
+                        <small>/ 100</small>
+                    </div>
+                </div>
+
+                <!-- Score Metrics Breakdown Grid -->
+                <div class="metrics-grid">
+                    <!-- Pace Card -->
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="icon-box pace-bg"><i class="fa-solid fa-gauge-high"></i></span> 
+                            <span class="metric-title">Pace</span>
+                        </div>
+                        <div class="metric-value"><strong id="paceScore">0</strong> <small>/ 100</small></div>
+                        <div class="progress-bar"><div class="fill" id="paceBar" style="width: 0%;"></div></div>
+                    </div>
+
+                    <!-- Fluency Card -->
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="icon-box fluency-bg"><i class="fa-solid fa-comments"></i></span> 
+                            <span class="metric-title">Fluency</span>
+                        </div>
+                        <div class="metric-value"><strong id="fluencyScore">0</strong> <small>/ 100</small></div>
+                        <div class="progress-bar"><div class="fill" id="fluencyBar" style="width: 0%;"></div></div>
+                    </div>
+
+                    <!-- Vocabulary Card -->
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="icon-box vocab-bg"><i class="fa-solid fa-book"></i></span> 
+                            <span class="metric-title">Vocabulary</span>
+                        </div>
+                        <div class="metric-value"><strong id="vocabScore">0</strong> <small>/ 100</small></div>
+                        <div class="progress-bar"><div class="fill" id="vocabBar" style="width: 0%;"></div></div>
+                    </div>
+
+                    <!-- Expressiveness Card -->
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <span class="icon-box express-bg"><i class="fa-solid fa-face-smile"></i></span> 
+                            <span class="metric-title">Expressiveness</span>
+                        </div>
+                        <div class="metric-value"><strong id="expressScore">0</strong> <small>/ 100</small></div>
+                        <div class="progress-bar"><div class="fill" id="expressBar" style="width: 0%;"></div></div>
+                    </div>
+                </div>
+
+                <div class="info-note">
+                    <i class="fa-solid fa-circle-info"></i> These scores are generated using AI analysis of your speech and communication patterns.
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+google-genai
+python-dotenv
+faster-whisper
+librosa
+praat-parselmouth
+soundfile
+numpy
+scipy
+pandas
+tqdm
+ffmpeg-python
+click
+colorama
+language-tool-python
+nltk
+textblobA
