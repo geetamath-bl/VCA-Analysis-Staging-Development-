@@ -6,14 +6,14 @@
       "use": "@vercel/static"
     },
     {
-      "src": "vca-without-azure-stt/app/main.py",
+      "src": "app/main.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/vca/(.*)",
-      "dest": "vca-without-azure-stt/app/main.py"
+      "dest": "app/main.py"
     },
     {
       "src": "/(.*)",
