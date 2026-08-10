@@ -13,4 +13,4 @@ click
 colorama
 language-tool-python
 nltk
-textblobA
+textblob
