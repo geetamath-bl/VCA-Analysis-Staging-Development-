@@ -5,16 +5,6 @@
       "excludeFiles": "{tests/**,testdata/**,static/**,assets/**,**/*.mp3,**/*.wav,**/*.mp4}"
     }
   },
-  "builds": [
-    {
-      "src": "app/main.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "frontend/**",
-      "use": "@vercel/static"
-    }
-  ],
   "routes": [
     {
       "src": "/vca/(.*)",
@@ -25,12 +15,8 @@
       "dest": "app/main.py"
     },
     {
-      "src": "/",
-      "dest": "frontend/index.html"
-    },
-    {
       "src": "/(.*)",
-      "dest": "frontend/$1"
+      "dest": "app/main.py"
     }
   ]
 }
