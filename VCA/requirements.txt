@@ -6,3 +6,5 @@ google-genai
 python-dotenv
 requests
 textblob
+ffmpeg-python
+static-ffmpeg

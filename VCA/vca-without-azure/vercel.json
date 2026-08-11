@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "functions": {
+    "app/main.py": {
+      "excludeFiles": "{tests/**,testdata/**,static/**,assets/**,**/*.mp3,**/*.wav,**/*.mp4}"
+    }
+  },
   "builds": [
     {
       "src": "app/main.py",
@@ -17,10 +22,6 @@
     },
     {
       "src": "/docs",
-      "dest": "app/main.py"
-    },
-    {
-      "src": "/openapi.json",
       "dest": "app/main.py"
     },
     {
