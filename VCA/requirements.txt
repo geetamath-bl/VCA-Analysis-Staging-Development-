@@ -7,5 +7,7 @@ python-dotenv
 requests
 textblob
 numpy
+scipy
+pandas
 ffmpeg-python
 static-ffmpeg
