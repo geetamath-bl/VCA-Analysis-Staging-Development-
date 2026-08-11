@@ -2,3 +2,7 @@ venv/
 *.exe
 .env
 __pycache__/
+VCA/vca-without-azure/audio_files/*
+VCA/vca-without-azure/log/*
+VCA/vca-without-azure/transcript/*
+VCA/vca-without-azure/json_output/*
