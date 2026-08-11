@@ -11,3 +11,4 @@ scipy
 pandas
 ffmpeg-python
 static-ffmpeg
+librosa
