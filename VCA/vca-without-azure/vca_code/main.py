@@ -1,10 +1,15 @@
+import os
 import sys
 from pathlib import Path
+
+# Force language_tool_python to use remote API (Bypasses Java requirement on Vercel)
+os.environ["LTP_REMOTE_SERVER"] = "https://api.languagetool.org"
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles  # <--- Added import
+from fastapi.staticfiles import StaticFiles
 
 # Setup directory paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,11 +33,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount API
-app.include_router(vca_router)
+# Serve static frontend files
+app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 
-# --- FIX: Serve all static assets (CSS, JS, images, etc.) from frontend folder ---
-app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
+# Mount API routes
+app.include_router(vca_router)
 
 # Serve Frontend HTML
 @app.get("/")
