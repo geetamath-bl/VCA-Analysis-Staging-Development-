@@ -1,13 +1,12 @@
 # File: Repo/VCA/vca-without-azure/vca_code/vocab_grammar_analyzer.py
 # This module provides the VocabGrammarAnalyzer class, 
-#  which analyzes a transcript for grammar errors and vocabulary 
-#  richness using LanguageTool (local, no Azure service involved).
-
+# which analyzes a transcript for grammar errors and vocabulary 
+# richness using LanguageTool (remote API mode for serverless/Vercel compatibility).
 
 import re
 import json
 from pathlib import Path
-from language_tool_python import LanguageToolPublicAPI
+import language_tool_python
 
 from config import Config
 from logger_setup import PipelineLogger
@@ -16,14 +15,23 @@ from logger_setup import PipelineLogger
 class VocabGrammarAnalyzer:
     """
     Analyzes a transcript for grammar errors and vocabulary richness
-    using LanguageTool (local, no Azure service involved).
+    using LanguageTool (remote server mode, no local Java required).
     """
 
     def __init__(self, config: Config, logger: PipelineLogger):
         self.config = config
         self.logger = logger
-        self.tool = language_tool_python.LanguageTool('en-US', remote_server='https://api.languagetool.org')
         
+        # Connect to remote public API to bypass local Java requirements on Vercel
+        try:
+            self.tool = language_tool_python.LanguageTool(
+                'en-US', 
+                remote_server='https://api.languagetool.org'
+            )
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize LanguageTool remote server: {e}")
+            self.tool = None
+
     def analyze(self, transcript_text: str) -> dict:
         """
         Runs grammar checking and vocabulary richness analysis on the given transcript.
@@ -52,7 +60,7 @@ class VocabGrammarAnalyzer:
             f"Errors/100 words: {metrics['errors_per_100_words']}"
         )
 
-        # Log individual grammar issues at a finer detail level (useful for debugging/review)
+        # Log individual grammar issues at a finer detail level
         for issue in grammar_issues:
             self.logger.info(f"    - {issue}")
 
@@ -60,9 +68,17 @@ class VocabGrammarAnalyzer:
 
     def _check_grammar(self, transcript_text: str) -> tuple[int, list]:
         """Runs LanguageTool grammar check. Returns (error_count, list_of_issue_descriptions)."""
-        matches = self.tool.check(transcript_text)
-        issues = [f"{m.rule_id}: {m.message}" for m in matches]
-        return len(matches), issues
+        if not self.tool:
+            self.logger.warning("LanguageTool instance unavailable. Returning 0 grammar errors.")
+            return 0, []
+
+        try:
+            matches = self.tool.check(transcript_text)
+            issues = [f"{m.rule_id}: {m.message}" for m in matches]
+            return len(matches), issues
+        except Exception as e:
+            self.logger.warning(f"Grammar check failed via remote API: {e}")
+            return 0, []
 
     def _analyze_vocabulary(self, transcript_text: str) -> dict:
         """Computes Type-Token Ratio (TTR) and average word length."""
@@ -90,5 +106,9 @@ class VocabGrammarAnalyzer:
         return json_path
 
     def close(self):
-        """Releases the LanguageTool resource. Call this when done with the analyzer."""
-        self.tool.close()
+        """Releases the LanguageTool resource safely."""
+        if self.tool:
+            try:
+                self.tool.close()
+            except Exception:
+                pass
