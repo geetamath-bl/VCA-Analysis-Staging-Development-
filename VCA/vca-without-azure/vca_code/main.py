@@ -1,10 +1,10 @@
-# File: vca_code/main.py
 import sys
 from pathlib import Path
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles  # <--- Added import
 
 # Setup directory paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -31,6 +31,9 @@ app.add_middleware(
 # Mount API
 app.include_router(vca_router)
 
+# --- FIX: Serve all static assets (CSS, JS, images, etc.) from frontend folder ---
+app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
 # Serve Frontend HTML
 @app.get("/")
 async def serve_frontend():
@@ -38,7 +41,3 @@ async def serve_frontend():
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-    
-    
-    
-    

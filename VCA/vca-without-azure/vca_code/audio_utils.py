@@ -1,7 +1,4 @@
-# File: wAzure/vca_code/audio_utils.py
-# This module provides utilities for handling audio files, 
-# including validation and conversion to a standard format 
-#                         (16kHz, 16-bit, mono PCM WAV) using ffmpeg.
+# File: vca_code/audio_utils.py
 
 import subprocess
 import shutil
@@ -13,8 +10,10 @@ from logger_setup import PipelineLogger
 class AudioFileHandler:
     """
     Handles audio file input validation and conversion.
-    Ensures the pipeline always works with a proper
-    16kHz, 16-bit, mono PCM WAV file, converting via ffmpeg if needed.
+
+    If FFmpeg is available, non-WAV files can be converted locally.
+    If FFmpeg is not available (for example, on Vercel), the backend
+    can still process WAV files directly.
     """
 
     TARGET_SAMPLE_RATE = 16000
@@ -22,59 +21,109 @@ class AudioFileHandler:
 
     def __init__(self, logger: PipelineLogger):
         self.logger = logger
-        self._check_ffmpeg_available()
 
-    def _check_ffmpeg_available(self):
-        """Confirms ffmpeg is installed and reachable on PATH."""
-        if shutil.which("ffmpeg") is None:
-            raise EnvironmentError(
-                "ffmpeg not found on PATH. Install it first (e.g., 'brew install ffmpeg' on window)."
+        # Do not fail during application startup/deployment if FFmpeg
+        # is unavailable. Vercel does not provide FFmpeg by default.
+        self.ffmpeg_path = shutil.which("ffmpeg")
+
+        if self.ffmpeg_path:
+            self.logger.info(f"FFmpeg found: {self.ffmpeg_path}")
+        else:
+            self.logger.info(
+                "FFmpeg not found. WAV files will be processed directly."
             )
 
     def prepare_audio_file(self, input_path: Path) -> Path:
         """
         Validates the input audio file and converts it to WAV if necessary.
-        Returns the path to a WAV file ready for downstream processing.
+
+        WAV files can be processed without FFmpeg.
+        Non-WAV files require FFmpeg.
         """
+
         self.logger.step(f"Checking audio file: {input_path.name}")
 
         if not input_path.exists():
-            raise FileNotFoundError(f"Audio file not found: {input_path}")
+            raise FileNotFoundError(
+                f"Audio file not found: {input_path}"
+            )
 
+        # WAV does not require FFmpeg.
         if input_path.suffix.lower() == ".wav":
-            self.logger.info(f"  File is already .wav — no conversion needed.")
+            self.logger.info(
+                "  File is already .wav — no FFmpeg conversion needed."
+            )
             return input_path
 
-        self.logger.info(f"  File extension is '{input_path.suffix}' — conversion to .wav required.")
-        converted_path = self._convert_to_wav(input_path)
-        return converted_path
+        # Non-WAV files require FFmpeg.
+        if not self.ffmpeg_path:
+            raise EnvironmentError(
+                f"FFmpeg is not available on this server. "
+                f"Please upload a WAV file. Received: {input_path.suffix}"
+            )
+
+        self.logger.info(
+            f"  File extension is '{input_path.suffix}' — "
+            "conversion to .wav required."
+        )
+
+        return self._convert_to_wav(input_path)
 
     def _convert_to_wav(self, input_path: Path) -> Path:
         """
-        Converts the given audio file to 16kHz, 16-bit, mono PCM WAV
-        using ffmpeg. Saves the converted file alongside the original,
-        with the same base name and a .wav extension.
+        Converts the given audio file to:
+        - 16kHz
+        - 16-bit
+        - mono
+        - PCM WAV
+
+        using FFmpeg.
         """
+
+        if not self.ffmpeg_path:
+            raise EnvironmentError(
+                "FFmpeg is not available. Cannot convert audio."
+            )
+
         output_path = input_path.with_suffix(".wav")
 
         cmd = [
-            "ffmpeg",
-            "-y",  # overwrite output file if it already exists
-            "-i", str(input_path),
-            "-ar", str(self.TARGET_SAMPLE_RATE),
-            "-ac", str(self.TARGET_CHANNELS),
-            "-sample_fmt", "s16",
-            str(output_path)
+            self.ffmpeg_path,
+            "-y",
+            "-i",
+            str(input_path),
+            "-ar",
+            str(self.TARGET_SAMPLE_RATE),
+            "-ac",
+            str(self.TARGET_CHANNELS),
+            "-sample_fmt",
+            "s16",
+            str(output_path),
         ]
 
-        self.logger.info(f"  Running ffmpeg conversion: {input_path.name} -> {output_path.name}")
+        self.logger.info(
+            f"  Running FFmpeg conversion: "
+            f"{input_path.name} -> {output_path.name}"
+        )
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+        )
 
         if result.returncode != 0:
-            self.logger.error(f"  ffmpeg conversion failed: {result.stderr}")
-            raise RuntimeError(f"ffmpeg conversion failed for {input_path}: {result.stderr}")
+            self.logger.error(
+                f"  FFmpeg conversion failed: {result.stderr}"
+            )
 
-        self.logger.info(f"  Conversion successful: {output_path}")
+            raise RuntimeError(
+                f"FFmpeg conversion failed for {input_path}: "
+                f"{result.stderr}"
+            )
+
+        self.logger.info(
+            f"  Conversion successful: {output_path}"
+        )
+
         return output_path
-    

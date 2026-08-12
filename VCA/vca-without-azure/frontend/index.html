@@ -4,77 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VCA - Verbal Communication Analyzer</title>
-    <style>
-        /* General Reset */
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-        body { background-color: #f4f6f9; color: #333; min-height: 100vh; }
-        .app-container { display: flex; min-height: 100vh; }
-        
-        /* Sidebar Styling */
-        .sidebar { width: 280px; background-color: #121829; color: #fff; padding: 30px 20px; display: flex; flex-direction: column; gap: 25px; flex-shrink: 0; }
-        .brand h1 { font-size: 24px; letter-spacing: 1px; }
-        .brand p { font-size: 10px; color: #8a94a6; letter-spacing: 0.5px; margin-top: 4px; }
-        .sidebar-text { font-size: 13px; color: #9aa5b9; line-height: 1.5; }
-        
-        /* Main Workspace */
-        .main-content { flex: 1; padding: 40px; display: flex; flex-direction: column; gap: 25px; }
-        .card { background: #ffffff; border-radius: 16px; padding: 35px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); }
-        .card h2 { font-size: 22px; margin-bottom: 6px; color: #1a202c; }
-        .subtitle { color: #718096; font-size: 14px; margin-bottom: 25px; }
-        
-        /* Dropzone */
-        .drop-zone { border: 2px dashed #cbd5e0; border-radius: 12px; padding: 40px; text-align: center; background-color: #fafbfc; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px; margin-bottom: 25px; }
-        .upload-icon { width: 48px; height: 48px; background: #8b5cf6; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-        .btn-browse { background-color: #4c6fff; color: #fff; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: background 0.2s; }
-        .btn-browse:hover { background-color: #3b5bdb; }
-        .file-info { font-size: 14px; color: #4a5568; margin-top: 5px; }
-        .check-icon { color: #38a169; font-weight: bold; margin-left: 5px; }
-        
-        /* Status Banner for Upload/Conversion Steps */
-        .status-box {
-            background-color: #eff6ff;
-            border: 1px solid #bfdbfe;
-            color: #1d4ed8;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            text-align: center;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        /* Primary Button */
-        .btn-primary { width: 100%; background-color: #6c5ce7; color: white; border: none; padding: 16px; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background-color 0.2s, opacity 0.2s; }
-        .btn-primary:hover:not(:disabled) { background-color: #5b4bc4; }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .hidden { display: none !important; }
-        
-        /* Results Card */
-        .overall-badge { text-align: center; padding: 24px; background: #f8fafc; border-radius: 12px; margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .overall-badge span { font-size: 14px; color: #64748b; }
-        .overall-badge h1 { font-size: 48px; color: #1e293b; margin: 8px 0; }
-        .rating { display: inline-block; padding: 4px 14px; background: #dcfce7; color: #15803d; border-radius: 20px; font-size: 13px; font-weight: 600; }
-        .metrics-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
-        .metric-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px 12px; border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 12px; }
-        .metric-header { display: flex; align-items: center; gap: 8px; }
-        .metric-label { color: #4a5568; font-size: 13px; font-weight: 500; }
-        .metric-value { font-size: 22px; font-weight: 700; color: #1a202c; }
-        
-        /* Icons */
-        .icon-wrap { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .icon-pace { background: #e0f2fe; color: #0284c7; }
-        .icon-fluency { background: #dcfce7; color: #16a34a; }
-        .icon-filler { background: #fef3c7; color: #d97706; }
-        .icon-express { background: #f3e8ff; color: #9333ea; }
-        .icon-vocab { background: #ffe4e6; color: #e11d48; }
-
-        @media (max-width: 1200px) { .metrics-row { grid-template-columns: repeat(3, 1fr); } }
-        @media (max-width: 768px) { .app-container { flex-direction: column; } .sidebar { width: 100%; } .metrics-row { grid-template-columns: repeat(1, 1fr); } }
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="app-container">
@@ -84,25 +14,66 @@
                 <p>VERBAL COMMUNICATION ANALYZER</p>
             </div>
             <div class="sidebar-text">
-                <p>Upload audio/video files. Real-time conversion and compression status updates provided.</p>
+                <p>Upload or record audio/video files in real-time with instant analysis.</p>
             </div>
         </aside>
 
         <main class="main-content">
             <section class="card upload-card">
-                <h2>Upload Media</h2>
-                <p class="subtitle">Accepts MP4, MP3, WAV, OGG, M4A.</p>
+                <!-- Navigation Tabs -->
+                <div class="tabs-header">
+                    <button id="tabUploadBtn" class="tab-btn active">Upload Media</button>
+                    <button id="tabRecordBtn" class="tab-btn">Record Audio</button>
+                </div>
 
-                <div class="drop-zone" id="dropZone">
-                    <div class="upload-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <!-- Tab 1: Upload Media -->
+                <div id="tabUploadContent" class="tab-content active">
+                    <p class="subtitle">Accepts MP4, MP3, WAV, OGG, M4A.</p>
+
+                    <div class="drop-zone" id="dropZone">
+                        <div class="upload-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        </div>
+                        <label for="audioFile" class="btn-browse">Browse File</label>
+                        <input type="file" id="audioFile" accept="audio/*, video/*" hidden>
+                        
+                        <div id="fileInfo" class="file-info hidden">
+                            <span id="fileName"></span> (<span id="fileSize"></span>)
+                            <span class="check-icon">✔</span>
+                        </div>
                     </div>
-                    <label for="audioFile" class="btn-browse">Browse File</label>
-                    <input type="file" id="audioFile" accept="audio/*, video/*" hidden>
-                    
-                    <div id="fileInfo" class="file-info hidden">
-                        <span id="fileName"></span> (<span id="fileSize"></span>)
-                        <span class="check-icon">✔</span>
+
+                    <button id="btnAnalyzeUpload" class="btn-primary" disabled>
+                        ⚡ Analyze Audio
+                    </button>
+                </div>
+
+                <!-- Tab 2: Record Audio -->
+                <div id="tabRecordContent" class="tab-content">
+                    <p class="subtitle">Record live audio directly using your microphone.</p>
+
+                    <div class="drop-zone recorder-zone">
+                        <div class="record-timer" id="recordTimer">00:00</div>
+                        <div class="recorder-actions">
+                            <button id="btnStartRecord" class="btn-record-action start">🎤 Start Recording</button>
+                            <button id="btnStopRecord" class="btn-record-action stop hidden">⏹ Stop Recording</button>
+                        </div>
+                        
+                        <audio id="audioPreview" controls class="hidden audio-preview"></audio>
+
+                        <div id="recordInfo" class="file-info hidden">
+                            <span id="recordFileName">recorded_audio.wav</span>
+                            <span class="check-icon">✔</span>
+                        </div>
+                    </div>
+
+                    <div class="recording-buttons-group">
+                        <a id="btnDownloadRecord" class="btn-secondary hidden" download="recorded_audio.wav">
+                            📥 Download .wav
+                        </a>
+                        <button id="btnAnalyzeRecord" class="btn-primary hidden">
+                            ⚡ Analyze Recorded Audio
+                        </button>
                     </div>
                 </div>
 
@@ -110,20 +81,18 @@
                 <div id="statusBox" class="status-box hidden">
                     <span id="statusText">Processing...</span>
                 </div>
-
-                <button id="btnAnalyze" class="btn-primary" disabled>
-                    ⚡ Analyze Audio
-                </button>
             </section>
 
+            <!-- Results Section -->
             <section id="resultsSection" class="card results-card hidden">
                 <h2>Analysis Results</h2>
                 <p class="subtitle">File: <strong id="resFileName">--</strong></p>
 
+                <!-- Highlighting Rating Text over Numeric Score -->
                 <div class="overall-badge">
-                    <span>Overall Score</span>
-                    <h1 id="overallScore">--</h1>
-                    <span id="ratingBadge" class="rating">--</span>
+                    <span class="badge-title">Overall Performance</span>
+                    <h1 id="ratingBadgeText" class="highlight-rating-text">--</h1>
+                    <span class="numeric-sub-score">Score: <strong id="overallScore">--</strong>/100</span>
                 </div>
 
                 <div class="metrics-row">
@@ -137,170 +106,6 @@
         </main>
     </div>
 
-    <script>
-        const audioFileInput = document.getElementById('audioFile');
-        const fileInfo = document.getElementById('fileInfo');
-        const fileNameSpan = document.getElementById('fileName');
-        const fileSizeSpan = document.getElementById('fileSize');
-        const btnAnalyze = document.getElementById('btnAnalyze');
-        const resultsSection = document.getElementById('resultsSection');
-        const statusBox = document.getElementById('statusBox');
-        const statusText = document.getElementById('statusText');
-
-        let selectedFile = null;
-
-        audioFileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                selectedFile = e.target.files[0];
-                fileNameSpan.textContent = selectedFile.name;
-                fileSizeSpan.textContent = (selectedFile.size / (1024 * 1024)).toFixed(2) + ' MB';
-                fileInfo.classList.remove('hidden');
-                btnAnalyze.disabled = false;
-                statusBox.classList.add('hidden');
-            }
-        });
-
-        function showStatus(msg) {
-            statusText.textContent = msg;
-            statusBox.classList.remove('hidden');
-        }
-
-        btnAnalyze.addEventListener('click', async () => {
-            if (!selectedFile) return;
-
-            btnAnalyze.disabled = true;
-            resultsSection.classList.add('hidden');
-
-            try {
-                let fileToSend = selectedFile;
-                const fileExt = selectedFile.name.split('.').pop().toLowerCase();
-                const fileSizeMB = selectedFile.size / (1024 * 1024);
-
-                // Check 1: File is NOT a WAV file -> Convert to WAV
-                if (fileExt !== 'wav') {
-                    showStatus(`🔄 Converting ${fileExt.toUpperCase()} file to .wav format...`);
-                    btnAnalyze.textContent = "⚙️ Converting...";
-                    fileToSend = await convertToWav(selectedFile);
-                } 
-                // Check 2: File IS WAV but LARGER than 3MB -> Compress it
-                else if (fileSizeMB > 3.0) {
-                    showStatus(`📉 File is ${fileSizeMB.toFixed(2)} MB. Compressing to under 3 MB...`);
-                    btnAnalyze.textContent = "⚙️ Compressing...";
-                    fileToSend = await convertToWav(selectedFile); // Re-encodes with mono 16kHz to compress
-                }
-
-                // Step 3: Send file for AI Analysis
-                showStatus("⚡ Processing analysis... Please wait.");
-                btnAnalyze.textContent = "⏳ Analyzing...";
-
-                const formData = new FormData();
-                formData.append("file", fileToSend);
-
-                const response = await fetch("/vca/analyze", {
-                    method: "POST",
-                    body: formData
-                });
-
-                if (!response.ok) throw new Error(`Server returned error status: ${response.status}`);
-
-                const data = await response.json();
-                if (data.status === "success") {
-                    statusBox.classList.add('hidden');
-                    displayResults(data);
-                } else {
-                    alert("Analysis failed. Please try again.");
-                }
-
-            } catch (error) {
-                showStatus("❌ Error during processing: " + error.message);
-                alert("Error processing file: " + error.message);
-            } finally {
-                btnAnalyze.disabled = false;
-                btnAnalyze.textContent = "⚡ Analyze Audio";
-            }
-        });
-
-        // Convert / Compress Media Engine via Web Audio API
-        async function convertToWav(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-
-            // Compress to 16,000 Hz, 1 Channel (Mono)
-            const targetSampleRate = 16000;
-            const targetChannels = 1;
-
-            const offlineCtx = new OfflineAudioContext(
-                targetChannels,
-                audioBuffer.duration * targetSampleRate,
-                targetSampleRate
-            );
-
-            const source = offlineCtx.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(offlineCtx.destination);
-            source.start(0);
-
-            const renderedBuffer = await offlineCtx.startRendering();
-            const wavBlob = bufferToWave(renderedBuffer);
-
-            const originalName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-            return new File([wavBlob], `${originalName}_converted.wav`, { type: 'audio/wav' });
-        }
-
-        function bufferToWave(abuffer) {
-            let numOfChan = abuffer.numberOfChannels,
-                length = abuffer.length * numOfChan * 2 + 44,
-                buffer = new ArrayBuffer(length),
-                view = new DataView(buffer),
-                channels = [], i, sample, offset = 0, pos = 0;
-
-            setUint32(0x46464952); // "RIFF"
-            setUint32(length - 8); 
-            setUint32(0x45564157); // "WAVE"
-            setUint32(0x20746d66); // "fmt " chunk
-            setUint32(16);         // length = 16
-            setUint16(1);          // PCM
-            setUint16(numOfChan);
-            setUint32(abuffer.sampleRate);
-            setUint32(abuffer.sampleRate * 2 * numOfChan);
-            setUint16(numOfChan * 2);
-            setUint16(16);
-            setUint32(0x61746164); // "data" - chunk
-            setUint32(length - pos - 4);
-
-            for(i = 0; i < abuffer.numberOfChannels; i++) {
-                channels.push(abuffer.getChannelData(i));
-            }
-
-            while(pos < length) {
-                for(i = 0; i < numOfChan; i++) {
-                    sample = Math.max(-1, Math.min(1, channels[i][offset]));
-                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767)|0;
-                    view.setInt16(pos, sample, true);
-                    pos += 2;
-                }
-                offset++;
-            }
-
-            return new Blob([buffer], { type: "audio/wav" });
-
-            function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
-            function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
-        }
-
-        function displayResults(data) {
-            const report = data.report;
-            document.getElementById('resFileName').textContent = data.filename;
-            document.getElementById('overallScore').textContent = report.overall_score;
-            document.getElementById('ratingBadge').textContent = report.rating;
-            document.getElementById('paceScore').textContent = report.pace_score;
-            document.getElementById('fluencyScore').textContent = report.fluency_score;
-            document.getElementById('fillerScore').textContent = report.filler_score;
-            document.getElementById('expressivenessScore').textContent = report.expressiveness_score;
-            document.getElementById('vocabScore').textContent = report.vocab_grammar_score;
-            resultsSection.classList.remove('hidden');
-        }
-    </script>
+    <script src="/static/script.js"></script>
 </body>
 </html>
