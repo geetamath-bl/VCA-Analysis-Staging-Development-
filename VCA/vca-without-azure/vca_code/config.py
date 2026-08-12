@@ -25,7 +25,7 @@ class Config:
 
         # Gemini settings
         self.gemini_api_key: str = os.environ.get("GEMINI_API_KEY", "")
-        self.gemini_model: str = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash") 
+        self.gemini_model: str = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash") 
 
         # Project folder structure (relative to project root, one level above /vca_code)
         self.project_root: Path = Path(__file__).resolve().parent.parent

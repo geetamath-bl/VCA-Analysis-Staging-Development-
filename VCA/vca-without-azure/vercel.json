@@ -1,13 +1,12 @@
 {
-  "version": 2,
   "builds": [
-    {
-      "src": "frontend/**",
-      "use": "@vercel/static"
-    },
     {
       "src": "vca_code/main.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -16,12 +15,8 @@
       "dest": "vca_code/main.py"
     },
     {
-      "src": "/static/(.*)",
-      "dest": "/frontend/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/frontend/index.html"
+      "src": "/(.*)",
+      "dest": "frontend/$1"
     }
   ]
 }

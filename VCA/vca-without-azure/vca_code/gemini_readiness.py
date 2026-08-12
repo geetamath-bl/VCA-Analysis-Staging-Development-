@@ -1,13 +1,12 @@
 # File: Repo/VCA/vca-without-azure/vca_code/gemini_readiness.py
 # This module checks the readiness of the Gemini API and its dependencies before running the pipeline.
 # Details:
-#  - Creates the Gemini Client once and stores it on self.client — reused later by Transcriber, 
-#  - Makes a genuinely minimal API call (a one-word response) purely 
-#                              to confirm the key/model combination actually works 
-# - check_all() method :  list of checks → pass/fail pattern
-
+#  - Creates the Gemini Client once and stores it on self.client — reused later by Transcriber
+#  - Makes a genuinely minimal API call (a one-word response) purely to confirm the key/model combination works
+#  - check_all() method: list of checks -> pass/fail pattern
 
 from google import genai
+from google.genai import types
 from google.genai import errors as genai_errors
 
 # Flexible import handling for Config and PipelineLogger
@@ -26,8 +25,7 @@ except ImportError:
 class GeminiReadinessChecker:
     """
     Verifies that the Gemini API is reachable and the API key is valid
-    before the pipeline proceeds. Also checks ffmpeg availability
-    (audio conversion dependency).
+    before the pipeline proceeds.
     """
 
     def __init__(self, config: Config, logger: PipelineLogger):
@@ -68,7 +66,10 @@ class GeminiReadinessChecker:
 
         response = self.client.models.generate_content(
             model=self.config.gemini_model,
-            contents="Reply with exactly one word: OK"
+            contents="Reply with exactly one word: OK",
+            config=types.GenerateContentConfig(
+                temperature=0.0
+            )
         )
 
         if not response or not response.text:
