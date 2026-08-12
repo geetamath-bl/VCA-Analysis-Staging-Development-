@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "builds": [
     {
       "src": "vca_code/main.py",
@@ -12,11 +13,15 @@
   "routes": [
     {
       "src": "/vca/(.*)",
-      "dest": "vca_code/main.py"
+      "dest": "/vca_code/main.py"
+    },
+    {
+      "src": "/static/(.*)",
+      "dest": "/frontend/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/$1"
+      "dest": "/frontend/$1"
     }
   ]
 }

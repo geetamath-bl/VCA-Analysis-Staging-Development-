@@ -32,7 +32,7 @@ app.add_middleware(
 app.include_router(vca_router)
 
 # --- FIX: Serve all static assets (CSS, JS, images, etc.) from frontend folder ---
-app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
 
 # Serve Frontend HTML
 @app.get("/")
