@@ -7,7 +7,7 @@
 import re
 import json
 from pathlib import Path
-import language_tool_python
+from language_tool_python import LanguageToolPublicAPI
 
 from config import Config
 from logger_setup import PipelineLogger
@@ -22,7 +22,7 @@ class VocabGrammarAnalyzer:
     def __init__(self, config: Config, logger: PipelineLogger):
         self.config = config
         self.logger = logger
-        self.tool = language_tool_python.LanguageTool('en-US')
+        self.tool = LanguageToolPublicAPI('en-US')
 
     def analyze(self, transcript_text: str) -> dict:
         """
