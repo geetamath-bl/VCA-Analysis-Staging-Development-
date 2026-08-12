@@ -22,8 +22,8 @@ class VocabGrammarAnalyzer:
     def __init__(self, config: Config, logger: PipelineLogger):
         self.config = config
         self.logger = logger
-        self.tool = LanguageToolPublicAPI('en-US')
-
+        self.tool = language_tool_python.LanguageTool('en-US', remote_server='https://api.languagetool.org')
+        
     def analyze(self, transcript_text: str) -> dict:
         """
         Runs grammar checking and vocabulary richness analysis on the given transcript.
