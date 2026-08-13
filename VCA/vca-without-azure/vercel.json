@@ -2,11 +2,8 @@
   "version": 2,
   "builds": [
     {
-      "src": "main.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxDuration": 15
-      }
+      "src": "api/router.py",
+      "use": "@vercel/python"
     },
     {
       "src": "frontend/**",
@@ -15,8 +12,12 @@
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "dest": "/api/router.py"
+    },
+    {
       "src": "/(.*)",
-      "dest": "frontend/$1"
+      "dest": "/frontend/$1"
     }
   ]
 }
