@@ -10,5 +10,6 @@ numpy
 scipy
 pandas
 ffmpeg-python
+static-ffmpeg
 librosa
 language-tool-python
