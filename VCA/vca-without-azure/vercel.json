@@ -1,14 +1,12 @@
 {
   "version": 2,
-  "functions": {
-    "vca_code/main.py": {
-      "maxDuration": 60
-    }
-  },
   "builds": [
     {
-      "src": "vca_code/main.py",
-      "use": "@vercel/python"
+      "src": "main.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxDuration": 15
+      }
     },
     {
       "src": "frontend/**",
@@ -17,16 +15,8 @@
   ],
   "routes": [
     {
-      "src": "/vca/(.*)",
-      "dest": "/vca_code/main.py"
-    },
-    {
-      "src": "/static/(.*)",
-      "dest": "/frontend/$1"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/vca_code/main.py"
+      "dest": "frontend/$1"
     }
   ]
 }
