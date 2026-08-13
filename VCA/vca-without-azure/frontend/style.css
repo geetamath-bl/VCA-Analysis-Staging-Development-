@@ -312,6 +312,7 @@ body {
 .icon-vocab { background: #ffe4e6; color: #e11d48; }
 
 /* Responsive adjustments */
+
 @media (max-width: 1200px) {
     .metrics-row { grid-template-columns: repeat(3, 1fr); }
 }
