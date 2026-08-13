@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+import static_ffmpeg
 
 # ============================================================
 # Environment configuration
@@ -19,7 +20,6 @@ os.environ["LTP_REMOTE_SERVER"] = "https://api.languagetool.org"
 # static-ffmpeg is included in requirements.txt.
 # This adds the bundled ffmpeg/ffprobe executables to PATH
 # so subprocess calls such as "ffmpeg" can find them.
-import static_ffmpeg
 
 static_ffmpeg.add_paths()
 
