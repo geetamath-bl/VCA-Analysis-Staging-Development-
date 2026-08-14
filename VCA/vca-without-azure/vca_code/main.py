@@ -1,14 +1,29 @@
-# vca_code/main.py
-
 import os
 import sys
+import stat
 from pathlib import Path
 
 # Environment configuration
 os.environ["LTP_REMOTE_SERVER"] = "https://api.languagetool.org"
 
-import static_ffmpeg
-static_ffmpeg.add_paths()
+# ==============================================================================
+# 1. SETUP BUNDLED FFMPEG BINARY (Replaces static_ffmpeg)
+# ==============================================================================
+# BASE_DIR points to root: ~/Desktop/VCA_Without_Azure_Staging
+BASE_DIR = Path(__file__).resolve().parent.parent
+FFMPEG_BIN = BASE_DIR / "bin" / "ffmpeg"
+
+# Ensure execution permissions & add to PATH on Vercel Linux environment
+if FFMPEG_BIN.exists():
+    # Grant Linux execution permission (+x)
+    st = os.stat(FFMPEG_BIN)
+    os.chmod(FFMPEG_BIN, st.st_mode | stat.S_IEXEC)
+    
+    # Add root bin folder to PATH so pydub / ffmpeg-python find it automatically
+    bin_dir_str = str(FFMPEG_BIN.parent)
+    if bin_dir_str not in os.environ["PATH"]:
+        os.environ["PATH"] = bin_dir_str + os.pathsep + os.environ["PATH"]
+# ==============================================================================
 
 import uvicorn
 from fastapi import FastAPI
@@ -17,7 +32,6 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 # Project paths
-BASE_DIR = Path(__file__).resolve().parent.parent
 VCA_CODE_DIR = BASE_DIR / "vca_code"
 API_DIR = BASE_DIR / "api"
 FRONTEND_DIR = BASE_DIR / "frontend"
