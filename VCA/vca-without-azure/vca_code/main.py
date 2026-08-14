@@ -7,23 +7,45 @@ from pathlib import Path
 os.environ["LTP_REMOTE_SERVER"] = "https://api.languagetool.org"
 
 # ==============================================================================
-# 1. SETUP BUNDLED FFMPEG BINARY (Replaces static_ffmpeg)
+# 1. SETUP PATHS & BUNDLED FFMPEG BINARY
 # ==============================================================================
-# BASE_DIR points to root: ~/Desktop/VCA_Without_Azure_Staging
-BASE_DIR = Path(__file__).resolve().parent.parent
+# Determine Root Directory safely across local and Vercel environments
+CURRENT_FILE = Path(__file__).resolve()
+BASE_DIR = CURRENT_FILE.parent.parent
+
+# Fallback: If bin doesn't exist relative to file, check current working directory
+if not (BASE_DIR / "bin").exists():
+    BASE_DIR = Path(os.getcwd())
+
 FFMPEG_BIN = BASE_DIR / "bin" / "ffmpeg"
 
-# Ensure execution permissions & add to PATH on Vercel Linux environment
+# Configure FFmpeg in PATH
 if FFMPEG_BIN.exists():
-    # Grant Linux execution permission (+x)
-    st = os.stat(FFMPEG_BIN)
-    os.chmod(FFMPEG_BIN, st.st_mode | stat.S_IEXEC)
-    
-    # Add root bin folder to PATH so pydub / ffmpeg-python find it automatically
+    # Attempt to set permissions if allowed, but ignore if filesystem is read-only
+    try:
+        st = os.stat(FFMPEG_BIN)
+        os.chmod(FFMPEG_BIN, st.st_mode | stat.S_IEXEC)
+    except Exception as e:
+        print(f"Notice: Could not modify permissions on {FFMPEG_BIN}: {e}")
+
+    # Add bin directory to PATH so pydub / ffmpeg-python find it
     bin_dir_str = str(FFMPEG_BIN.parent)
     if bin_dir_str not in os.environ["PATH"]:
         os.environ["PATH"] = bin_dir_str + os.pathsep + os.environ["PATH"]
+else:
+    print(f"Warning: FFmpeg binary not found at {FFMPEG_BIN}")
 # ==============================================================================
+
+# Project paths
+VCA_CODE_DIR = BASE_DIR / "vca_code"
+API_DIR = BASE_DIR / "api"
+FRONTEND_DIR = BASE_DIR / "frontend"
+
+# Ensure imports resolve cleanly
+for path in [BASE_DIR, VCA_CODE_DIR, API_DIR]:
+    path_string = str(path)
+    if path_string not in sys.path:
+        sys.path.insert(0, path_string)
 
 import uvicorn
 from fastapi import FastAPI
@@ -31,19 +53,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-# Project paths
-VCA_CODE_DIR = BASE_DIR / "vca_code"
-API_DIR = BASE_DIR / "api"
-FRONTEND_DIR = BASE_DIR / "frontend"
-
-# Add to sys.path
-for path in [VCA_CODE_DIR, API_DIR]:
-    path_string = str(path)
-    if path_string not in sys.path:
-        sys.path.insert(0, path_string)
-
-# Import router
-from router import router as vca_router  # This imports from api/router.py
+# Import router safely
+try:
+    from router import router as vca_router
+except ModuleNotFoundError:
+    from api.router import router as vca_router
 
 # FastAPI app
 app = FastAPI(
