@@ -1,3 +1,19 @@
+// UPLOAD SIZE LIMITS
+// Vercel rejects request bodies over 4.5 MB (HTTP 413), so audio is converted
+// to mono 16-bit WAV at the highest sample rate that keeps it under this size.
+const MAX_UPLOAD_BYTES = 4.2 * 1024 * 1024;        // margin under 4.5 MB for form overhead
+const BEST_SAMPLE_RATE = 16000;
+const MIN_SAMPLE_RATE = 8000;                      // still enough for speech and pitch analysis
+const WAV_HEADER_BYTES = 44;
+const MAX_AUDIO_SECONDS = Math.floor((MAX_UPLOAD_BYTES - WAV_HEADER_BYTES) / (MIN_SAMPLE_RATE * 2));
+const MAX_AUDIO_LABEL = formatDuration(MAX_AUDIO_SECONDS);
+
+function formatDuration(totalSeconds) {
+    const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+    const secs = String(Math.floor(totalSeconds % 60)).padStart(2, '0');
+    return `${mins}:${secs}`;
+}
+
 // TAB NAVIGATION SETUP
 const tabUploadBtn = document.getElementById('tabUploadBtn');
 const tabRecordBtn = document.getElementById('tabRecordBtn');
@@ -97,12 +113,16 @@ btnStartRecord.addEventListener('click', async () => {
 
         // Start Timer
         secondsRecorded = 0;
-        recordTimer.textContent = "00:00";
+        recordTimer.textContent = `00:00 / ${MAX_AUDIO_LABEL}`;
         timerInterval = setInterval(() => {
             secondsRecorded++;
-            const mins = String(Math.floor(secondsRecorded / 60)).padStart(2, '0');
-            const secs = String(secondsRecorded % 60).padStart(2, '0');
-            recordTimer.textContent = `${mins}:${secs}`;
+            recordTimer.textContent = `${formatDuration(secondsRecorded)} / ${MAX_AUDIO_LABEL}`;
+
+            // Stop automatically at the longest length the server can accept
+            if (secondsRecorded >= MAX_AUDIO_SECONDS) {
+                btnStopRecord.click();
+                showStatus(`⏹️ Recording stopped at the ${MAX_AUDIO_LABEL} maximum.`);
+            }
         }, 1000);
 
     } catch (err) {
@@ -130,42 +150,36 @@ async function processAndSendFile(file, buttonElement) {
     resultsSection.classList.add('hidden');
 
     try {
-        let fileToSend = file;
-        const fileExt = file.name.split('.').pop().toLowerCase();
-        const fileSizeMB = file.size / (1024 * 1024);
+        const fileToSend = await prepareForUpload(file);
 
-        if (fileExt !== 'wav') {
-            showStatus(`🔄 Converting ${fileExt.toUpperCase()} file to .wav...`);
-            fileToSend = await convertToWav(file);
-        } else if (fileSizeMB > 3.0) {
-            showStatus(`📉 Compressing ${fileSizeMB.toFixed(2)} MB .wav to under 3 MB...`);
-            fileToSend = await convertToWav(file);
-        }
-
-        showStatus("⚡ Processing analysis... Please wait.");
+        showStatus("⚡ Processing analysis... This can take up to a minute.");
         buttonElement.textContent = "⏳ Analyzing...";
 
         const formData = new FormData();
         formData.append("file", fileToSend);
 
-        const response = await fetch("/vca/analyze", {
-            method: "POST",
-            body: formData
-        });
+        let response;
+        try {
+            response = await fetch("/vca/analyze", {
+                method: "POST",
+                body: formData
+            });
+        } catch (networkError) {
+            throw new Error("Could not reach the server. Please check your internet connection and try again.");
+        }
 
-        if (!response.ok) throw new Error(`Server returned status: ${response.status}`);
+        if (!response.ok) throw new Error(await describeServerError(response));
 
         const data = await response.json();
         if (data.status === "success") {
             statusBox.classList.add('hidden');
             displayResults(data);
         } else {
-            alert("Analysis failed. Please check logs.");
+            throw new Error("Analysis did not complete. Please try again.");
         }
 
     } catch (error) {
-        showStatus("❌ Error during processing: " + error.message);
-        alert("Error analyzing file: " + error.message);
+        showStatus("❌ " + error.message);
     } finally {
         buttonElement.disabled = false;
         buttonElement.textContent = "⚡ Analyze Audio";
@@ -177,23 +191,81 @@ function showStatus(msg) {
     statusBox.classList.remove('hidden');
 }
 
-// WEB AUDIO API PCM CONVERTER TO 16kHz MONO WAV
+// Returns a WAV file small enough for the server, converting only when needed.
+async function prepareForUpload(file) {
+    const isWav = file.name.toLowerCase().endsWith('.wav');
+    if (isWav && file.size <= MAX_UPLOAD_BYTES) return file;
+
+    showStatus("🔄 Preparing audio for upload...");
+    const audioBuffer = await decodeAudio(file);
+    const duration = audioBuffer.duration;
+
+    if (duration > MAX_AUDIO_SECONDS) {
+        throw new Error(
+            `This audio is ${formatDuration(duration)} long. The maximum is ${MAX_AUDIO_LABEL}. ` +
+            `Please upload or record a shorter clip.`
+        );
+    }
+
+    // Highest sample rate (up to 16 kHz) that keeps the WAV under the size limit
+    const fittingRate = Math.floor((MAX_UPLOAD_BYTES - WAV_HEADER_BYTES) / (duration * 2));
+    const sampleRate = Math.max(MIN_SAMPLE_RATE, Math.min(BEST_SAMPLE_RATE, fittingRate));
+    return await renderToWav(audioBuffer, sampleRate, file.name);
+}
+
+// Turns a failed response into a clear message, using the server's detail when available.
+async function describeServerError(response) {
+    let detail = "";
+    try {
+        const body = await response.json();
+        if (typeof body.detail === "string") detail = body.detail;
+    } catch (e) { /* response was not JSON */ }
+
+    switch (response.status) {
+        case 413:
+            return `The audio file is too large to upload. Please use a clip shorter than ${MAX_AUDIO_LABEL}.`;
+        case 429:
+            return detail || "The analysis service is busy right now. Please wait a minute and try again.";
+        case 400:
+            return detail || "This audio file could not be read. Please try a different file.";
+        case 504:
+            return "The analysis took too long. Please try a shorter clip.";
+        default:
+            return detail
+                ? `Analysis failed: ${detail}`
+                : `Analysis failed (server error ${response.status}). Please try again.`;
+    }
+}
+
+// WEB AUDIO API PCM CONVERTER TO MONO WAV
 async function convertBlobToWav(blob) {
     const file = new File([blob], "recorded_audio.webm", { type: blob.type });
     return await convertToWav(file);
 }
 
 async function convertToWav(file) {
+    const audioBuffer = await decodeAudio(file);
+    return await renderToWav(audioBuffer, BEST_SAMPLE_RATE, file.name);
+}
+
+async function decodeAudio(file) {
     const arrayBuffer = await file.arrayBuffer();
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    try {
+        return await audioCtx.decodeAudioData(arrayBuffer);
+    } catch (e) {
+        throw new Error("This file's audio could not be read. Please try a WAV, MP3 or M4A file.");
+    } finally {
+        audioCtx.close();
+    }
+}
 
-    const targetSampleRate = 16000;
+async function renderToWav(audioBuffer, targetSampleRate, originalFileName) {
     const targetChannels = 1;
 
     const offlineCtx = new OfflineAudioContext(
         targetChannels,
-        audioBuffer.duration * targetSampleRate,
+        Math.ceil(audioBuffer.duration * targetSampleRate),
         targetSampleRate
     );
 
@@ -205,7 +277,7 @@ async function convertToWav(file) {
     const renderedBuffer = await offlineCtx.startRendering();
     const wavBlob = bufferToWave(renderedBuffer);
 
-    const originalName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+    const originalName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) || originalFileName;
     return new File([wavBlob], `${originalName}_converted.wav`, { type: 'audio/wav' });
 }
 

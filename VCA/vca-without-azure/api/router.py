@@ -1,6 +1,8 @@
+import os
 import sys
 import math
 import time
+import uuid
 import shutil
 import traceback
 from pathlib import Path
@@ -30,6 +32,7 @@ router = APIRouter(
 )
 
 # Global Instances
+IS_VERCEL = bool(os.environ.get("VERCEL"))
 config = Config()
 logger = PipelineLogger(log_folder=config.log_folder, total_steps=8)
 
@@ -111,106 +114,114 @@ async def analyze_audio(file: UploadFile = File(...)):
     logger.info("VCA Analyze API Called")
     logger.info("=" * 70)
 
-    uploaded_path: Path | None = None
+    # Every file this request creates is tracked here and removed at the end
+    request_files: list[Path] = []   # uploaded + converted audio
+    output_files: list[Path] = []    # transcript and JSON reports
+    original_filename = Path(file.filename or "audio.wav").name
 
-    # 1. Save uploaded file to temp path
     try:
-        uploaded_path = config.audio_input_folder / file.filename
-        with open(uploaded_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # 1. Save uploaded file under a unique name, so concurrent uploads
+        #    with the same filename never overwrite each other
+        try:
+            uploaded_path = config.audio_input_folder / f"{uuid.uuid4().hex[:8]}_{original_filename}"
+            request_files.append(uploaded_path)
+            with open(uploaded_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
 
-        audio_handler = AudioFileHandler(logger)
-        wav_path = audio_handler.prepare_audio_file(uploaded_path)
-        base_filename = wav_path.stem
-        logger.info(f"Audio Ready: {wav_path.name}")
+            if uploaded_path.stat().st_size == 0:
+                raise ValueError("The uploaded file is empty.")
 
-    except Exception as e:
-        logger.error(f"Audio Preparation Failed: {e}")
-        traceback.print_exc()
-        if uploaded_path and uploaded_path.exists():
-            uploaded_path.unlink()
-        raise HTTPException(status_code=400, detail=f"Audio Preparation Error: {str(e)}")
+            audio_handler = AudioFileHandler(logger)
+            wav_path = audio_handler.prepare_audio_file(uploaded_path)
+            request_files.append(wav_path)
+            base_filename = wav_path.stem
+            logger.info(f"Audio Ready: {wav_path.name}")
 
-    # 2. Gemini Readiness Check (With Client Caching and Retry Logic)
-    try:
-        client = get_gemini_client()
-    except APIError as api_err:
-        logger.error(f"Gemini API Error during readiness check: {api_err}")
-        traceback.print_exc()
-        if uploaded_path and uploaded_path.exists():
-            uploaded_path.unlink()
-        raise gemini_error_to_http(api_err)
-    except Exception as e:
-        logger.error(f"Gemini Initialization Failed: {e}")
-        traceback.print_exc()
-        if uploaded_path and uploaded_path.exists():
-            uploaded_path.unlink()
-        raise HTTPException(status_code=500, detail=f"Gemini Readiness Failed: {str(e)}")
+        except Exception as e:
+            logger.error(f"Audio Preparation Failed: {e}")
+            traceback.print_exc()
+            raise HTTPException(status_code=400, detail=f"Audio Preparation Error: {str(e)}")
 
-    # 3. Process Audio Analysis Pipeline
-    try:
-        logger.info("Starting Audio Analysis Pipeline...")
+        # 2. Gemini Readiness Check (With Client Caching and Retry Logic)
+        try:
+            client = get_gemini_client()
+        except APIError as api_err:
+            logger.error(f"Gemini API Error during readiness check: {api_err}")
+            traceback.print_exc()
+            raise gemini_error_to_http(api_err)
+        except Exception as e:
+            logger.error(f"Gemini Initialization Failed: {e}")
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"Gemini Readiness Failed: {str(e)}")
 
-        # Step 3a: Transcribe
-        transcriber = Transcriber(config, logger, client)
-        transcript_text, segments = transcriber.transcribe(wav_path)
-        transcriber.save_transcript(transcript_text, base_filename)
-        transcriber.save_segments(segments, base_filename)
+        # 3. Process Audio Analysis Pipeline
+        try:
+            logger.info("Starting Audio Analysis Pipeline...")
 
-        # Step 3b: Pace, Fluency, Fillers
-        metrics_calc = MetricsCalculator(config, logger)
-        metrics = metrics_calc.compute_metrics(transcript_text, wav_path)
-        metrics_calc.save_metrics(metrics, base_filename)
+            # Step 3a: Transcribe
+            transcriber = Transcriber(config, logger, client)
+            transcript_text, segments = transcriber.transcribe(wav_path)
+            output_files.append(transcriber.save_transcript(transcript_text, base_filename))
+            output_files.append(transcriber.save_segments(segments, base_filename))
 
-        # Step 3c: Expressiveness / Pitch
-        pitch_calc = PitchAnalyzer(config, logger)
-        pitch_metrics = pitch_calc.analyze(wav_path)
-        pitch_calc.save_metrics(pitch_metrics, base_filename)
+            # Step 3b: Pace, Fluency, Fillers
+            metrics_calc = MetricsCalculator(config, logger)
+            metrics = metrics_calc.compute_metrics(transcript_text, wav_path)
+            output_files.append(metrics_calc.save_metrics(metrics, base_filename))
 
-        # Step 3d: Vocab & Grammar
-        vocab_calc = VocabGrammarAnalyzer(config, logger)
-        vocab_metrics = vocab_calc.analyze(transcript_text)
-        vocab_calc.save_metrics(vocab_metrics, base_filename)
-        vocab_calc.close()
+            # Step 3c: Expressiveness / Pitch
+            pitch_calc = PitchAnalyzer(config, logger)
+            pitch_metrics = pitch_calc.analyze(wav_path)
+            output_files.append(pitch_calc.save_metrics(pitch_metrics, base_filename))
 
-        # Step 3e: Score Computation
-        scorer = VCAScorer(config, logger)
-        score_report = scorer.compute_score(metrics, pitch_metrics, vocab_metrics)
-        scorer.save_report(score_report, base_filename)
+            # Step 3d: Vocab & Grammar
+            vocab_calc = VocabGrammarAnalyzer(config, logger)
+            vocab_metrics = vocab_calc.analyze(transcript_text)
+            output_files.append(vocab_calc.save_metrics(vocab_metrics, base_filename))
+            vocab_calc.close()
 
-        logger.info("Analysis Completed Successfully.")
+            # Step 3e: Score Computation
+            scorer = VCAScorer(config, logger)
+            score_report = scorer.compute_score(metrics, pitch_metrics, vocab_metrics)
+            output_files.append(scorer.save_report(score_report, base_filename))
 
-        return {
-            "status": "success",
-            "filename": file.filename,
-            "report": {
-                "pace_score": score_report.get("pace_score"),
-                "fluency_score": score_report.get("fluency_score"),
-                "filler_score": score_report.get("filler_score"),
-                "expressiveness_score": score_report.get("expressiveness_score"),
-                "vocab_grammar_score": score_report.get("vocab_grammar_score"),
-                "overall_score": score_report.get("overall_score"),
-                "rating": score_report.get("rating")
+            logger.info("Analysis Completed Successfully.")
+
+            return {
+                "status": "success",
+                "filename": original_filename,
+                "report": {
+                    "pace_score": score_report.get("pace_score"),
+                    "fluency_score": score_report.get("fluency_score"),
+                    "filler_score": score_report.get("filler_score"),
+                    "expressiveness_score": score_report.get("expressiveness_score"),
+                    "vocab_grammar_score": score_report.get("vocab_grammar_score"),
+                    "overall_score": score_report.get("overall_score"),
+                    "rating": score_report.get("rating")
+                }
             }
-        }
 
-    except APIError as api_err:
-        logger.error(f"VCA Pipeline Gemini API Error: {api_err}")
-        traceback.print_exc()
-        raise gemini_error_to_http(api_err)
+        except APIError as api_err:
+            logger.error(f"VCA Pipeline Gemini API Error: {api_err}")
+            traceback.print_exc()
+            raise gemini_error_to_http(api_err)
 
-    except Exception as e:
-        logger.error(f"VCA Pipeline Failed: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        except Exception as e:
+            logger.error(f"VCA Pipeline Failed: {e}")
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=str(e))
 
     finally:
-        logger.info("Cleaning Temporary Input File...")
-        if uploaded_path and uploaded_path.exists():
+        # Uploaded and converted audio are always removed. Transcripts and JSON
+        # reports are kept locally for inspection, but removed on Vercel, where
+        # nobody can read them and they would only pile up in /tmp.
+        logger.info("Cleaning temporary request files...")
+        files_to_remove = request_files + (output_files if IS_VERCEL else [])
+        for path in files_to_remove:
             try:
-                uploaded_path.unlink()
-            except Exception:
-                pass
+                path.unlink(missing_ok=True)
+            except Exception as cleanup_err:
+                logger.warning(f"Could not remove {path.name}: {cleanup_err}")
         logger.info("=" * 70)
         logger.info("Request Completed")
         logger.info("=" * 70)

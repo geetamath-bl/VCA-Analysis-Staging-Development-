@@ -27,11 +27,19 @@ class Transcriber:
         self.logger.info("  Uploading audio file to Gemini...")
         uploaded_file = self.client.files.upload(file=str(wav_file_path))
 
-        self.logger.info("  Requesting transcription...")
-        response = self.client.models.generate_content(
-            model=self.config.gemini_model,
-            contents=[uploaded_file, TRANSCRIPTION_PROMPT]
-        )
+        try:
+            self.logger.info("  Requesting transcription...")
+            response = self.client.models.generate_content(
+                model=self.config.gemini_model,
+                contents=[uploaded_file, TRANSCRIPTION_PROMPT]
+            )
+        finally:
+            # Remove the audio from Gemini right away instead of leaving it
+            # stored there for 48 hours
+            try:
+                self.client.files.delete(name=uploaded_file.name)
+            except Exception as e:
+                self.logger.warning(f"  Could not delete uploaded audio from Gemini: {e}")
 
         full_transcript, segments = self._parse_response(response.text)
 
