@@ -5,10 +5,8 @@ python-multipart>=0.0.9
 google-genai
 python-dotenv
 requests
-textblob
 numpy
 scipy
-pandas
 ffmpeg-python
 librosa
 language-tool-python
