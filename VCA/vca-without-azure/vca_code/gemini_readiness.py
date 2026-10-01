@@ -32,9 +32,15 @@ class GeminiReadinessChecker:
         self.config = config
         self.logger = logger
         self.client = None
+        self.last_error = None  # Real exception from the most recent failed check
 
     def check_all(self) -> bool:
-        """Runs all readiness checks. Returns True only if everything passes."""
+        """
+        Runs all readiness checks. Returns True only if everything passes.
+        On failure, the underlying exception is kept in self.last_error so the
+        caller can report the real cause (e.g. a Gemini 429) instead of a generic error.
+        """
+        self.last_error = None
         self.logger.step("Checking Gemini API readiness")
 
         checks = [
@@ -48,6 +54,7 @@ class GeminiReadinessChecker:
                 self.logger.info(f"   ✓ {check_name}: OK")
             except Exception as e:
                 self.logger.error(f"   ✗ {check_name}: FAILED — {str(e)}")
+                self.last_error = e
                 all_passed = False
 
         if all_passed:

@@ -1,4 +1,5 @@
 import sys
+import math
 import time
 import shutil
 import traceback
@@ -36,10 +37,40 @@ logger = PipelineLogger(log_folder=config.log_folder, total_steps=8)
 CACHED_GEMINI_CLIENT = None
 
 
+def is_rate_limit_error(api_err: APIError) -> bool:
+    return api_err.code == 429 or api_err.status == "RESOURCE_EXHAUSTED"
+
+
+def get_retry_after_seconds(api_err: APIError, default: int = 60) -> int:
+    """Reads Gemini's suggested retry delay (e.g. "23s") from the error details."""
+    try:
+        for detail in api_err.details["error"]["details"]:
+            retry_delay = detail.get("retryDelay")
+            if retry_delay:
+                return max(1, math.ceil(float(retry_delay.rstrip("s"))))
+    except (KeyError, TypeError, ValueError, AttributeError):
+        pass
+    return default
+
+
+def gemini_error_to_http(api_err: APIError) -> HTTPException:
+    """Maps a Gemini APIError to the HTTP error returned to the client."""
+    if is_rate_limit_error(api_err):
+        retry_after = get_retry_after_seconds(api_err)
+        return HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Gemini API rate limit reached. Please wait {retry_after} seconds and try again.",
+            headers={"Retry-After": str(retry_after)}
+        )
+    return HTTPException(status_code=500, detail=f"Gemini API Error ({api_err.code}): {api_err.message}")
+
+
 def get_gemini_client():
     """
     Executes CTO's GeminiReadinessChecker and caches the client instance.
-    Includes retry logic if Google API limits are temporarily hit.
+    Retries transient failures (network errors, Gemini 5xx). Rate limits and
+    other client errors (bad key, unknown model) are raised immediately with
+    their real cause, since retrying them only spends more quota.
     """
     global CACHED_GEMINI_CLIENT
 
@@ -51,28 +82,24 @@ def get_gemini_client():
     retry_delays = [5, 10]  # Delays in seconds between retries
 
     for attempt in range(max_retries):
-        try:
-            logger.info(f"Initializing Gemini Client (Attempt {attempt + 1}/{max_retries})...")
-            if readiness_checker.check_all():
-                CACHED_GEMINI_CLIENT = readiness_checker.client
-                return CACHED_GEMINI_CLIENT
-        except APIError as api_err:
-            if "429" in str(api_err) or "RESOURCE_EXHAUSTED" in str(api_err):
-                if attempt < max_retries - 1:
-                    sleep_time = retry_delays[attempt]
-                    logger.warning(f"Rate limit hit during readiness check. Retrying in {sleep_time} seconds...")
-                    time.sleep(sleep_time)
-                    continue
-            raise api_err
-        except Exception as e:
-            if attempt < max_retries - 1:
-                sleep_time = retry_delays[attempt]
-                logger.warning(f"Readiness check failed ({e}). Retrying in {sleep_time}s...")
-                time.sleep(sleep_time)
-                continue
-            raise e
+        logger.info(f"Initializing Gemini Client (Attempt {attempt + 1}/{max_retries})...")
+        if readiness_checker.check_all():
+            CACHED_GEMINI_CLIENT = readiness_checker.client
+            return CACHED_GEMINI_CLIENT
 
-    raise RuntimeError("Gemini readiness check failed after maximum retries.")
+        error = readiness_checker.last_error
+        if isinstance(error, APIError) and error.code is not None and error.code < 500:
+            raise error
+
+        if attempt < max_retries - 1:
+            sleep_time = retry_delays[attempt]
+            logger.warning(f"Readiness check failed ({error}). Retrying in {sleep_time}s...")
+            time.sleep(sleep_time)
+
+    error = readiness_checker.last_error
+    if isinstance(error, APIError):
+        raise error
+    raise RuntimeError(f"Gemini readiness check failed after {max_retries} attempts: {error}")
 
 
 @router.post("/analyze")
@@ -112,13 +139,7 @@ async def analyze_audio(file: UploadFile = File(...)):
         traceback.print_exc()
         if uploaded_path and uploaded_path.exists():
             uploaded_path.unlink()
-
-        if "429" in str(api_err) or "RESOURCE_EXHAUSTED" in str(api_err):
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Gemini API rate limit reached. Please wait a minute before analyzing another file."
-            )
-        raise HTTPException(status_code=500, detail=f"Gemini API Error: {str(api_err)}")
+        raise gemini_error_to_http(api_err)
     except Exception as e:
         logger.error(f"Gemini Initialization Failed: {e}")
         traceback.print_exc()
@@ -176,12 +197,7 @@ async def analyze_audio(file: UploadFile = File(...)):
     except APIError as api_err:
         logger.error(f"VCA Pipeline Gemini API Error: {api_err}")
         traceback.print_exc()
-        if "429" in str(api_err) or "RESOURCE_EXHAUSTED" in str(api_err):
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Gemini API rate limit exceeded during analysis. Please wait ~30 seconds and retry."
-            )
-        raise HTTPException(status_code=500, detail=f"Gemini API Error: {str(api_err)}")
+        raise gemini_error_to_http(api_err)
 
     except Exception as e:
         logger.error(f"VCA Pipeline Failed: {e}")
