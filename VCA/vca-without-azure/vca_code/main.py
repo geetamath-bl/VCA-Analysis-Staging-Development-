@@ -53,6 +53,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+# Restore librosa's stub files on Vercel (must run before librosa is imported)
+import librosa_compat  # noqa: F401
+
 # Import router safely
 try:
     from router import router as vca_router
