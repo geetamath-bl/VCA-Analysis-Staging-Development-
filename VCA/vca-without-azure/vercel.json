@@ -5,7 +5,8 @@
       "src": "vca_code/main.py",
       "use": "@vercel/python",
       "config": {
-        "includeFiles": ["bin/ffmpeg", "frontend/**"]
+        "includeFiles": ["bin/ffmpeg", "frontend/**"],
+        "excludeFiles": "{**/tests/**,**/test/**,**/testing/tests/**,vca_code/test_*.py,audio_files/**,json_output/**,transcript/**,log/**}"
       }
     }
   ],

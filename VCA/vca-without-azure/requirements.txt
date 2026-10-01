@@ -7,6 +7,5 @@ python-dotenv
 requests
 numpy
 scipy
-ffmpeg-python
 librosa
 language-tool-python
