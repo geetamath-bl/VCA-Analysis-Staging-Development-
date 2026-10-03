@@ -125,21 +125,41 @@ btnAnalyzeRecord.addEventListener('click', async () => {
 });
 
 // FILE CONVERSION & SUBMISSION PROCESSOR
+// The server explains failures in the response body's `detail` field. Prefer it,
+// and fall back to a plain-language message per status code.
+function friendlyError(status, detail) {
+    if (detail) return detail;
+
+    switch (status) {
+        case 400: return "That audio could not be read. Please try a different recording.";
+        case 413: return "That recording is too large to upload. Please use a shorter clip.";
+        case 422: return "No clear speech was detected. Please try a clearer recording.";
+        case 429: return "The speech service is rate limited right now. Please wait a minute and try again.";
+        case 500: return "The server could not complete the analysis. Please try again.";
+        case 502:
+        case 503:
+        case 504: return "The analysis took too long to finish. Please try a shorter recording.";
+        default:  return `The server returned an unexpected error (${status}).`;
+    }
+}
+
 async function processAndSendFile(file, buttonElement) {
+    const originalLabel = buttonElement.textContent;
     buttonElement.disabled = true;
     resultsSection.classList.add('hidden');
 
     try {
-        let fileToSend = file;
-        const fileExt = file.name.split('.').pop().toLowerCase();
-        const fileSizeMB = file.size / (1024 * 1024);
+        // Always re-encode. This guarantees 16 kHz mono for the analysis and,
+        // more importantly, bounds the upload so it cannot be rejected with a 413.
+        showStatus("🔄 Preparing audio...");
+        const { file: fileToSend, trimmed } = await convertToWav(file);
 
-        if (fileExt !== 'wav') {
-            showStatus(`🔄 Converting ${fileExt.toUpperCase()} file to .wav...`);
-            fileToSend = await convertToWav(file);
-        } else if (fileSizeMB > 3.0) {
-            showStatus(`📉 Compressing ${fileSizeMB.toFixed(2)} MB .wav to under 3 MB...`);
-            fileToSend = await convertToWav(file);
+        if (trimmed) {
+            showStatus(`✂️ Long recording — analysing the first ${MAX_CLIP_SECONDS / 60} minutes.`);
+        }
+
+        if (fileToSend.size > MAX_UPLOAD_BYTES) {
+            throw new Error("This recording is too long to upload. Please use a shorter clip.");
         }
 
         showStatus("⚡ Processing analysis... Please wait.");
@@ -148,27 +168,41 @@ async function processAndSendFile(file, buttonElement) {
         const formData = new FormData();
         formData.append("file", fileToSend);
 
-        const response = await fetch("/vca/analyze", {
-            method: "POST",
-            body: formData
-        });
+        let response;
+        try {
+            response = await fetch("/vca/analyze", {
+                method: "POST",
+                body: formData
+            });
+        } catch (networkError) {
+            throw new Error("Could not reach the server. Please check your connection and try again.");
+        }
 
-        if (!response.ok) throw new Error(`Server returned status: ${response.status}`);
+        if (!response.ok) {
+            let detail = "";
+            try {
+                const body = await response.json();
+                if (body && typeof body.detail === "string") detail = body.detail;
+            } catch (parseError) {
+                // Not every error carries a JSON body — a 413 is rejected by the
+                // host before the application runs. Fall back to the status code.
+            }
+            throw new Error(friendlyError(response.status, detail));
+        }
 
         const data = await response.json();
         if (data.status === "success") {
             statusBox.classList.add('hidden');
             displayResults(data);
         } else {
-            alert("Analysis failed. Please check logs.");
+            throw new Error("The analysis did not complete. Please try again.");
         }
 
     } catch (error) {
-        showStatus("❌ Error during processing: " + error.message);
-        alert("Error analyzing file: " + error.message);
+        showStatus("❌ " + error.message);
     } finally {
         buttonElement.disabled = false;
-        buttonElement.textContent = "⚡ Analyze Audio";
+        buttonElement.textContent = originalLabel;
     }
 }
 
@@ -180,21 +214,32 @@ function showStatus(msg) {
 // WEB AUDIO API PCM CONVERTER TO 16kHz MONO WAV
 async function convertBlobToWav(blob) {
     const file = new File([blob], "recorded_audio.webm", { type: blob.type });
-    return await convertToWav(file);
+    return (await convertToWav(file)).file;
 }
 
-async function convertToWav(file) {
+// The host rejects request bodies above ~4.5 MB before the server ever runs,
+// which arrives as a 413 that no backend code can catch. The upload therefore
+// has to be bounded here. At 16 kHz mono 16-bit, audio costs 32 KB per second,
+// so 120 s is about 3.7 MB — comfortably inside the limit.
+const TARGET_SAMPLE_RATE = 16000;
+const MAX_CLIP_SECONDS = 120;
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+// Returns { file, trimmed }. Longer audio is truncated rather than rejected,
+// so a long recording still produces a result instead of a failed upload.
+async function convertToWav(file, maxSeconds = MAX_CLIP_SECONDS) {
     const arrayBuffer = await file.arrayBuffer();
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-    const targetSampleRate = 16000;
     const targetChannels = 1;
+    const seconds = Math.min(audioBuffer.duration, maxSeconds);
+    const frameCount = Math.max(1, Math.ceil(seconds * TARGET_SAMPLE_RATE));
 
     const offlineCtx = new OfflineAudioContext(
         targetChannels,
-        audioBuffer.duration * targetSampleRate,
-        targetSampleRate
+        frameCount,
+        TARGET_SAMPLE_RATE
     );
 
     const source = offlineCtx.createBufferSource();
@@ -206,7 +251,10 @@ async function convertToWav(file) {
     const wavBlob = bufferToWave(renderedBuffer);
 
     const originalName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-    return new File([wavBlob], `${originalName}_converted.wav`, { type: 'audio/wav' });
+    return {
+        file: new File([wavBlob], `${originalName}_converted.wav`, { type: 'audio/wav' }),
+        trimmed: audioBuffer.duration > maxSeconds
+    };
 }
 
 function bufferToWave(abuffer) {

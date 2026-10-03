@@ -41,21 +41,20 @@ class GeminiReadinessChecker:
             ("Gemini API key validity", self._check_gemini_api),
         ]
 
-        all_passed = True
         for check_name, check_func in checks:
             try:
                 check_func()
                 self.logger.info(f"   ✓ {check_name}: OK")
             except Exception as e:
+                # Re-raise rather than returning False. The caller's retry logic
+                # inspects the exception to tell a transient rate limit apart from
+                # a real failure; swallowing it here hid the cause and turned every
+                # rate limit into a generic 500.
                 self.logger.error(f"   ✗ {check_name}: FAILED — {str(e)}")
-                all_passed = False
+                raise
 
-        if all_passed:
-            self.logger.info("All Gemini readiness checks passed.")
-        else:
-            self.logger.error("One or more readiness checks failed. Aborting pipeline.")
-
-        return all_passed
+        self.logger.info("All Gemini readiness checks passed.")
+        return True
 
     def _check_gemini_api(self):
         """

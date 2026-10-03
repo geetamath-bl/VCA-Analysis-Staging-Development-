@@ -48,7 +48,9 @@ def get_gemini_client():
 
     readiness_checker = GeminiReadinessChecker(config, logger)
     max_retries = 3
-    retry_delays = [5, 10]  # Delays in seconds between retries
+    # Kept short on purpose: these sleeps block the request, and the serverless
+    # function has a hard duration limit that the pipeline itself already eats into.
+    retry_delays = [2, 4]  # Delays in seconds between retries
 
     for attempt in range(max_retries):
         try:
